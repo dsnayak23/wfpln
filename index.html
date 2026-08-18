@@ -463,6 +463,7 @@
         <div class="grid3" style="margin-bottom:14px;"><div><label>Target monthly income (₹)</label><input id="retTargetIncome" type="number"></div></div>
         <div id="retRows"></div>
         <button class="btn ghost small" onclick="addRow('retirement')">+ Add income source</button>
+        <div id="retProject" style="margin-top:10px;"></div>
         <div class="totbar" id="retTotals"></div>
         <h3 style="margin-top:20px;">SWP / income fund allocation</h3>
         <p class="sub">Split the SWP corpus across specific funds — e.g. ₹2L in XYZ, ₹3L in ABC. The check below tells you if it matches the SWP corpus.</p>
@@ -819,20 +820,27 @@ function recalc(){
   const lia=collectList("liabilities");
   const emiMonthly=lia.reduce((s,r)=>s+((Number(r.emi)||0)*(r.frequency==="Yearly"?1/12:1)),0);
   $("liaTotals").innerHTML=`Outstanding: <b>${fmt(lia.reduce((s,r)=>s+(Number(r.outstanding)||0),0))}</b> · Total EMI (monthly): <b>${fmt(emiMonthly)}</b>`;
-  // retirement rows: auto-project monthly income (schemes) or required corpus (SWP)
+  // retirement rows: live projection (does NOT overwrite the boxes)
+  let retProjRows="", swpNeed=0;
   document.querySelectorAll("#retRows .lrow").forEach(row=>{
     const sEl=row.querySelector('[data-key="scheme"]'), aEl=row.querySelector('[data-key="amount"]'), rEl=row.querySelector('[data-key="roi"]'), mEl=row.querySelector('[data-key="monthlyIncome"]');
     if(!sEl||!aEl||!rEl||!mEl) return;
     const scheme=sEl.value, amt=Number(aEl.value)||0, roi=Number(rEl.value)||0, mi=Number(mEl.value)||0;
-    if(scheme==="SWP"){ if(mi>0 && roi>0 && !aEl.value) aEl.value=Math.round(mi*12/(roi/100)); }
-    else { if(amt>0 && roi>0 && !mEl.value) mEl.value=Math.round(amt*roi/100/12); }
+    if(scheme==="SWP"){
+      if(mi>0 && roi>0){ const corpus=Math.round(mi*12/(roi/100)); swpNeed+=corpus; retProjRows+=`<div><b>SWP</b> — to draw ${fmt(mi)}/m at ${roi}% you need about <b>${fmt(corpus)}</b> corpus. <span class="muted">(enter it in Amount)</span></div>`; }
+    } else if(amt>0 && roi>0){
+      const proj=Math.round(amt*roi/100/12);
+      retProjRows+=`<div><b>${escapeHtml(scheme)}</b> — ${fmt(amt)} at ${roi}% → projected <b>${fmt(proj)}/month</b>${mi?"":' <span class="muted">(add it in Monthly income)</span>'}</div>`;
+    }
   });
+  if($("retProject")) $("retProject").innerHTML = retProjRows ? `<div style="background:#eef2fa;border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.7;"><div style="font-weight:700;color:#0F2C60;margin-bottom:2px;">Projected income</div>${retProjRows}</div>` : "";
   const ret=collectList("retirement");
   if($("retTotals")) $("retTotals").innerHTML=`Corpus allocated: <b>${fmt(ret.reduce((s,r)=>s+(Number(r.amount)||0),0))}</b> · Monthly income: <b>${fmt(ret.reduce((s,r)=>s+(Number(r.monthlyIncome)||0),0))}</b>`;
   const swpAlloc=collectList("swpFunds").reduce((s,r)=>s+(Number(r.amount)||0),0);
   const swpCorpus=ret.filter(r=>r.scheme==="SWP").reduce((s,r)=>s+(Number(r.amount)||0),0);
   if($("swpTotals")){ const diff=swpCorpus-swpAlloc;
-    $("swpTotals").innerHTML=`SWP corpus <b>${fmt(swpCorpus)}</b> · allocated to funds <b>${fmt(swpAlloc)}</b>`+
+    $("swpTotals").innerHTML=(swpNeed?`Required SWP corpus (from projections): <b>${fmt(swpNeed)}</b><br>`:"")+
+      `SWP corpus entered <b>${fmt(swpCorpus)}</b> · allocated to funds <b>${fmt(swpAlloc)}</b>`+
       (swpCorpus? (Math.abs(diff)<1?' <span style="color:#2E9E52;font-weight:700;">✓ matched</span>':` <span style="color:#C0392B;font-weight:700;">(${diff>0?"under":"over"} by ${fmt(Math.abs(diff))})</span>`):"");
   }
   // live allocation summary bar

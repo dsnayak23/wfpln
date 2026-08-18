@@ -108,7 +108,7 @@
   table.calc tfoot td{font-weight:700;background:#faf8f2;}
 
   .goalcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;background:#fcfbf7;}
-  .goalcard .ghead{display:grid;grid-template-columns:1.4fr 1fr 1fr .6fr .6fr .8fr auto;gap:8px;align-items:end;}
+  .goalcard .ghead{display:grid;grid-template-columns:1.4fr 1fr 1fr .6fr .6fr .6fr auto;gap:8px;align-items:end;}
   .goalcard .grow-remarks{margin-top:8px;}
   .gcalc{font-size:12.5px;color:var(--forest);background:#fff;border:1px dashed var(--line);border-radius:8px;padding:8px 12px;margin:12px 0;}
   .gcalc b{color:var(--copper);}
@@ -177,6 +177,9 @@
   .pdfimg{border-radius:8px;border:1px solid var(--line);object-fit:cover;}
   .pbar-mini{height:7px;background:var(--line);border-radius:4px;overflow:hidden;width:130px;display:inline-block;vertical-align:middle;}
   .pbar-mini>div{height:100%;background:var(--green);}
+  .allocbar{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;background:#eef2fa;border:1px solid var(--line);border-radius:8px;padding:8px 14px;margin:0 0 14px;font-size:12.5px;color:#2a3340;}
+  .allocbar span{white-space:nowrap;}
+  .amthint{position:fixed;display:none;background:#0F2C60;color:#fff;font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;z-index:400;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2);}
 
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--forest-dark);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:.25s;pointer-events:none;z-index:50;}
   .toast.show{opacity:1;}
@@ -313,9 +316,8 @@
       <div id="sg-assump" class="sgrp hidden">
       <div class="panel">
         <h3>Return assumptions</h3>
-        <p class="sub">Expected return is auto-assigned to every goal by its years-to-goal (max 12%). Inflation applies to all goals. These replace per-plan rates.</p>
-        <div class="grid3"><div><label>Inflation %</label><input id="asInflation" type="number" max="12" value="6"></div></div>
-        <div style="margin-top:14px;font-size:12px;color:var(--muted);font-weight:600;">Return bands — From year · To year (blank = and above) · Return %</div>
+        <p class="sub">Expected return is auto-assigned to every goal by its years-to-goal (max 12%). Inflation is set per goal in the plan.</p>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;">Return bands — From year · To year (blank = and above) · Return %</div>
         <div id="bandRows" style="margin-top:8px;"></div>
         <div style="margin-top:10px;">
           <button class="btn ghost small" onclick="addBandRow()">+ Add band</button>
@@ -369,6 +371,7 @@
       </div>
 
       <div class="secnav" id="secnav"></div>
+      <div id="allocBar" class="allocbar"></div>
 
       <div class="panel sec" id="sec-basic">
         <h3>Basic profile</h3>
@@ -578,6 +581,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
+<div id="amtHint" class="amthint"></div>
 <div id="pdfOverlay" class="pdfover hidden"><div class="box"><div class="spin"></div><div style="font-weight:700;color:#0F2C60;">Generating your PDF…</div><div class="muted" style="font-size:12.5px;margin-top:6px;">A full deck can take 30–100 seconds. Please keep this tab open.</div></div></div>
 <div id="planTypeModal" class="pdfover hidden"><div class="box" style="max-width:430px;">
   <div style="font-weight:800;color:#0F2C60;font-size:18px;margin-bottom:4px;">New plan</div>
@@ -686,7 +690,7 @@ const LISTS = {
     {key:"occupation",label:"Occupation",type:"text",w:"1fr"},
     {key:"remarks",label:"Remarks",type:"text",w:"1.2fr"}]},
   income:{container:"incRows",cols:[
-    {key:"head",label:"Head",type:"select",options:["Salary","Pension","NPS","Gratuity","Leave Encashment","Rental","Business","Interest","Other"],w:"1.2fr"},
+    {key:"head",label:"Head",type:"select",options:["Salary","Pension","PF","NPS","Gratuity","Leave Encashment","Rental","Business","Interest","Other"],w:"1.2fr"},
     {key:"amount",label:"Amount",type:"number",w:"1fr"},
     {key:"frequency",label:"Frequency",type:"select",options:["One-time","Monthly","Yearly"],w:"1fr"},
     {key:"remarks",label:"Remarks",type:"text",w:"1.2fr"}]},
@@ -696,9 +700,10 @@ const LISTS = {
     {key:"frequency",label:"Frequency",type:"select",options:["Monthly","Yearly","One-time"],w:"1fr"},
     {key:"remarks",label:"Remarks",type:"text",w:"1.2fr"}]},
   savings:{container:"savRows",cols:[
-    {key:"head",label:"Head",type:"select",options:["Mutual Fund","PPF","EPF","NPS","FD","Shares","Gold","Property","Savings A/c","Other"],w:"1.2fr"},
+    {key:"head",label:"Head",type:"select",options:["Mutual Fund","SIP","RD","PPF","EPF","NPS","FD","Post Office","Shares","Gold","Property","Savings A/c","Other"],w:"1.1fr"},
     {key:"amount",label:"Amount",type:"number",w:"1fr"},
-    {key:"remarks",label:"Owner / remarks",type:"text",w:"1.4fr"}]},
+    {key:"frequency",label:"Frequency",type:"select",options:["One-time","Monthly"],w:".9fr"},
+    {key:"remarks",label:"Owner / remarks",type:"text",w:"1.2fr"}]},
   liabilities:{container:"liaRows",cols:[
     {key:"head",label:"Head",type:"select",options:["Home Loan","Car Loan","Personal Loan","Credit Card","Business Loan","Other"],w:"1.2fr"},
     {key:"outstanding",label:"Outstanding",type:"number",w:"1fr"},
@@ -706,12 +711,14 @@ const LISTS = {
     {key:"frequency",label:"Frequency",type:"select",options:["Monthly","Yearly"],w:".9fr"},
     {key:"remarks",label:"Remarks",type:"text",w:"1fr"}]},
   insurance:{container:"insRows",cols:[
-    {key:"product",label:"Product",type:"text",w:"1.2fr"},
+    {key:"product",label:"Product",type:"text",w:"1.1fr"},
     {key:"insurer",label:"Insurer",type:"text",w:"1fr"},
     {key:"sumAssured",label:"Sum assured",type:"number",w:"1fr"},
-    {key:"premium",label:"Premium/yr",type:"number",w:"1fr"},
-    {key:"ppt",label:"PPT",type:"number",w:".6fr"},
-    {key:"term",label:"Term",type:"number",w:".6fr"}]},
+    {key:"premium",label:"Premium/yr",type:"number",w:".9fr"},
+    {key:"ppt",label:"PPT",type:"number",w:".5fr"},
+    {key:"startDate",label:"Start",type:"date",w:"1fr"},
+    {key:"endDate",label:"End",type:"date",w:"1fr"},
+    {key:"remarks",label:"Remarks",type:"text",w:"1fr"}]},
   protection:{container:"protRows",cols:[
     {key:"type",label:"Type",type:"select",options:["Term","Health","Personal Accident","Critical Illness","Other"],w:"1fr"},
     {key:"sumAssured",label:"Recommended cover",type:"number",w:"1fr"},
@@ -746,7 +753,7 @@ function buildRow(name,data){
       f.innerHTML=c.options.map(o=>`<option ${String(data[c.key])===o?"selected":""}>${o}</option>`).join("");
     }else{
       f=document.createElement("input");
-      f.type=c.type==="number"?"number":"text";
+      f.type=c.type==="number"?"number":(c.type==="date"?"date":"text");
       f.value=(data[c.key]!=null&&data[c.key]!=="")?data[c.key]:(c.def!=null?c.def:"");
       f.placeholder=c.label;
       if(c.max!=null) f.max=c.max;
@@ -791,23 +798,35 @@ function sipRequired(target,years,annualPct){
   return target/(((Math.pow(1+i,n)-1)/i)*(1+i));
 }
 function lumpsumRequired(target,years,annualPct){ if(years<=0) return target; return target/Math.pow(1+annualPct/100,years); }
+function sipFutureValue(monthly,years,annualPct){ monthly=Number(monthly)||0; const n=(Number(years)||0)*12, i=(Number(annualPct)||0)/100/12; if(monthly<=0||n<=0) return 0; return i===0? monthly*n : monthly*((Math.pow(1+i,n)-1)/i)*(1+i); }
 function freqTotals(list){
   let once=0,month=0,year=0;
   list.forEach(r=>{ const a=Number(r.amount)||0;
     if(r.frequency==="One-time") once+=a;
     else if(r.frequency==="Monthly") month+=a;
     else if(r.frequency==="Yearly") year+=a; });
-  return {once, month, yearTotal: month*12+year};
+  return {once, month, year, yearTotal: month*12+year};
 }
 function recalc(){
   const inc=freqTotals(collectList("income"));
   $("incTotals").innerHTML=`One-time: <b>${fmt(inc.once)}</b> · Monthly: <b>${fmt(inc.month)}</b> · Yearly total: <b>${fmt(inc.yearTotal)}</b>`;
   const exp=freqTotals(collectList("expenses"));
   $("expTotals").innerHTML=`One-time: <b>${fmt(exp.once)}</b> · Monthly: <b>${fmt(exp.month)}</b> · Yearly total: <b>${fmt(exp.yearTotal)}</b>`;
-  const sav=collectList("savings").reduce((s,r)=>s+(Number(r.amount)||0),0);
-  $("savTotals").innerHTML=`Total savings: <b>${fmt(sav)}</b>`;
+  const savList=collectList("savings");
+  const sav=savList.reduce((s,r)=>s+(Number(r.amount)||0),0);
+  const savMonthly=savList.filter(r=>r.frequency==="Monthly").reduce((s,r)=>s+(Number(r.amount)||0),0);
+  $("savTotals").innerHTML=`Total: <b>${fmt(sav)}</b> · of which monthly (RD/SIP/NPS…): <b>${fmt(savMonthly)}</b>`;
   const lia=collectList("liabilities");
-  $("liaTotals").innerHTML=`Outstanding: <b>${fmt(lia.reduce((s,r)=>s+(Number(r.outstanding)||0),0))}</b> · Total EMI: <b>${fmt(lia.reduce((s,r)=>s+(Number(r.emi)||0),0))}</b>`;
+  const emiMonthly=lia.reduce((s,r)=>s+((Number(r.emi)||0)*(r.frequency==="Yearly"?1/12:1)),0);
+  $("liaTotals").innerHTML=`Outstanding: <b>${fmt(lia.reduce((s,r)=>s+(Number(r.outstanding)||0),0))}</b> · Total EMI (monthly): <b>${fmt(emiMonthly)}</b>`;
+  // retirement rows: auto-project monthly income (schemes) or required corpus (SWP)
+  document.querySelectorAll("#retRows .lrow").forEach(row=>{
+    const sEl=row.querySelector('[data-key="scheme"]'), aEl=row.querySelector('[data-key="amount"]'), rEl=row.querySelector('[data-key="roi"]'), mEl=row.querySelector('[data-key="monthlyIncome"]');
+    if(!sEl||!aEl||!rEl||!mEl) return;
+    const scheme=sEl.value, amt=Number(aEl.value)||0, roi=Number(rEl.value)||0, mi=Number(mEl.value)||0;
+    if(scheme==="SWP"){ if(mi>0 && roi>0 && !aEl.value) aEl.value=Math.round(mi*12/(roi/100)); }
+    else { if(amt>0 && roi>0 && !mEl.value) mEl.value=Math.round(amt*roi/100/12); }
+  });
   const ret=collectList("retirement");
   if($("retTotals")) $("retTotals").innerHTML=`Corpus allocated: <b>${fmt(ret.reduce((s,r)=>s+(Number(r.amount)||0),0))}</b> · Monthly income: <b>${fmt(ret.reduce((s,r)=>s+(Number(r.monthlyIncome)||0),0))}</b>`;
   const swpAlloc=collectList("swpFunds").reduce((s,r)=>s+(Number(r.amount)||0),0);
@@ -815,6 +834,16 @@ function recalc(){
   if($("swpTotals")){ const diff=swpCorpus-swpAlloc;
     $("swpTotals").innerHTML=`SWP corpus <b>${fmt(swpCorpus)}</b> · allocated to funds <b>${fmt(swpAlloc)}</b>`+
       (swpCorpus? (Math.abs(diff)<1?' <span style="color:#2E9E52;font-weight:700;">✓ matched</span>':` <span style="color:#C0392B;font-weight:700;">(${diff>0?"under":"over"} by ${fmt(Math.abs(diff))})</span>`):"");
+  }
+  // live allocation summary bar
+  if($("allocBar")){
+    const surplus=inc.month-exp.month-savMonthly-emiMonthly;
+    const need=exp.month+savMonthly+emiMonthly;
+    const retIncome=ret.reduce((s,r)=>s+(Number(r.monthlyIncome)||0),0);
+    $("allocBar").innerHTML=
+      `<span><b>Monthly</b> — In ${fmt(inc.month)} · Out ${fmt(exp.month)} · Savings ${fmt(savMonthly)} · EMI ${fmt(emiMonthly)} · <b style="color:${surplus>=0?'#2E9E52':'#C0392B'};">Surplus ${fmt(surplus)}</b></span>`+
+      `<span><b>Yearly</b> — In ${fmt(inc.year)} · Out ${fmt(exp.year)} &nbsp;|&nbsp; <b>One-time</b> — In ${fmt(inc.once)} · Out ${fmt(exp.once)}</span>`+
+      `<span><b>Monthly income to cover</b> (expenses+savings+EMI): <b>${fmt(need)}</b>${retIncome?` · planned ${fmt(retIncome)} <b style="color:${retIncome>=need?'#2E9E52':'#C0392B'};">(${retIncome>=need?'✓':'gap '+fmt(need-retIncome)})</b>`:""}</span>`;
   }
   recalcGoals();
   updateFamilyDatalist();
@@ -868,8 +897,8 @@ function buildGoalCard(g){
       <div><label>For</label><input class="gf" data-key="forMember" list="familyNameList" value="${escapeHtml(g.forMember||"")}" placeholder="Self / member"></div>
       <div><label>Present cost</label><input class="gf" data-key="presentCost" type="number" value="${g.presentCost||""}" placeholder="1000000"></div>
       <div><label>Years</label><input class="gf" data-key="years" type="number" value="${g.years||""}" placeholder="5"></div>
+      <div><label>Infl %</label><input class="gf" data-key="inflation" type="number" value="${g.inflation!=null?g.inflation:6}"></div>
       <div><label>Return %</label><input class="gf" data-key="returnRate" type="number" readonly title="Auto-set from admin return bands by years" style="background:#eef2fa;" value="${g.returnRate!=null?g.returnRate:""}"></div>
-      <div><label>Recurring</label><select class="gf" data-key="yearly"><option ${g.yearly!=="Yes"?"selected":""}>No</option><option ${g.yearly==="Yes"?"selected":""}>Yes</option></select></div>
       <div><button class="btn danger small" onclick="this.closest('.goalcard').remove();recalc();">Remove</button></div>
     </div>
     <div class="grow-remarks"><input class="gf" data-key="remarks" value="${escapeHtml(g.remarks||"")}" placeholder="Remarks (e.g. spread over 2 years)"></div>
@@ -901,7 +930,7 @@ function collectGoals(){
 function recalcGoals(){
   document.querySelectorAll("#goalCards .goalcard").forEach(card=>{
     const gf={}; card.querySelectorAll(":scope > .ghead .gf").forEach(f=>gf[f.dataset.key]=f.value);
-    const pc=Number(gf.presentCost)||0, yrs=Number(gf.years)||0, infl=Number(ASSUMP.inflation)||0, ret=bandRate(yrs);
+    const pc=Number(gf.presentCost)||0, yrs=Number(gf.years)||0, infl=Number(gf.inflation)||0, ret=bandRate(yrs);
     const rrEl=card.querySelector('[data-key="returnRate"]'); if(rrEl) rrEl.value=ret;   // auto-fill from admin bands
     const fv=futureValue(pc,yrs,infl), reqSip=sipRequired(fv,yrs,ret), reqLump=lumpsumRequired(fv,yrs,ret);
     card.querySelector(".gcalc").innerHTML=`Future cost: <b>${fmt(fv)}</b> &nbsp;·&nbsp; Required monthly SIP: <b>${fmt(reqSip)}</b> &nbsp;·&nbsp; OR one-time lumpsum: <b>${fmt(reqLump)}</b>`;
@@ -911,17 +940,19 @@ function recalcGoals(){
       const type=row.querySelector('[data-key="type"]').value;
       if(type==="SIP") aSip+=amt; else aLump+=amt;
     });
-    const fvLump=aLump*Math.pow(1+ret/100,yrs);          // what the lumpsum grows to
-    const remaining=Math.max(0,fv-fvLump);               // still to be funded
-    const reqSipRemain=sipRequired(remaining,yrs,ret);   // SIP needed for the remainder
+    const fvLump=aLump*Math.pow(1+ret/100,yrs);              // what the lumpsum grows to
+    const fvSip=sipFutureValue(aSip,yrs,ret);                // what the SIP grows to
+    const remaining=Math.max(0,fv-fvLump);
+    const reqSipRemain=sipRequired(remaining,yrs,ret);
     let note;
     if(!aSip && !aLump){ note=`<span class="muted">No funds allocated yet.</span>`; }
     else {
-      const met=aSip>=reqSipRemain*0.99;
+      const totFv=fvLump+fvSip, met=totFv>=fv*0.99;
       note=`Allocated: <b>${fmt(aLump)} lumpsum</b> + <b>${fmt(aSip)}/m SIP</b>. `+
-        (aLump?`Lumpsum grows to ~${fmt(fvLump)}; remaining <b>${fmt(remaining)}</b> needs <b>${fmt(reqSipRemain)}/m</b> SIP. `:"")+
-        (remaining>0 ? (met?`<span class="ok">SIP target met ✓</span>`:`<span class="warn">SIP short by ${fmt(Math.max(0,reqSipRemain-aSip))}/m</span>`)
-                     : `<span class="ok">Lumpsum alone covers this goal ✓</span>`);
+        (aLump?`Lumpsum → <b>${fmt(fvLump)}</b>. `:"")+
+        (aSip?`SIP → <b>${fmt(fvSip)}</b>. `:"")+
+        `Total maturity <b>${fmt(totFv)}</b> vs goal <b>${fmt(fv)}</b> — `+
+        (met?`<span class="ok">on track ✓</span>`:`<span class="warn">short by ${fmt(Math.max(0,fv-totFv))}; add ~${fmt(reqSipRemain)}/m SIP</span>`);
     }
     card.querySelector(".allocsum").innerHTML=note;
   });
@@ -1396,8 +1427,7 @@ function bandRowHtml(b,i){ return `<div style="display:grid;grid-template-column
 function renderBands(){ const el=$("bandRows"); if(!el) return; el.innerHTML=(ASSUMP.bands||[]).map((b,i)=>bandRowHtml(b,i)).join("")||'<p class="muted">No bands. Add one.</p>'; }
 function addBandRow(){ ASSUMP.bands.push({from:0,to:null,rate:12}); renderBands(); }
 function saveAssumptions(){
-  ASSUMP.inflation=Math.min(12,Number($("asInflation").value)||6);
-  db.collection("settings").doc("assumptions").set({inflation:ASSUMP.inflation,bands:ASSUMP.bands})
+  db.collection("settings").doc("assumptions").set({inflation:ASSUMP.inflation||6,bands:ASSUMP.bands})
     .then(()=>toast("Assumptions saved.")).catch(e=>toast("Save failed: "+e.message));
 }
 function saveBrand(){
@@ -1505,17 +1535,17 @@ function buildFullReport(p){
   }
   // goals
   const goalCards=p.goals.map(g=>{
-    const r=bandRate(g.years);
-    const fv=futureValue(g.presentCost,g.years,Number(ASSUMP.inflation)||0), sip=sipRequired(fv,g.years,r), lump=lumpsumRequired(fv,g.years,r);
+    const r=bandRate(g.years), infl=(g.inflation!=null?Number(g.inflation):6);
+    const fv=futureValue(g.presentCost,g.years,infl), sip=sipRequired(fv,g.years,r), lump=lumpsumRequired(fv,g.years,r);
     const aLump=(g.funds||[]).filter(f=>f.type==="Lumpsum").reduce((s,f)=>s+(Number(f.amount)||0),0);
     const aSip=(g.funds||[]).filter(f=>f.type==="SIP").reduce((s,f)=>s+(Number(f.amount)||0),0);
-    const fvLump=aLump*Math.pow(1+r/100,g.years), remain=Math.max(0,fv-fvLump), reqSipRemain=sipRequired(remain,g.years,r);
+    const fvLump=aLump*Math.pow(1+r/100,g.years), fvSip=sipFutureValue(aSip,g.years,r), totFv=fvLump+fvSip;
     const funds=(g.funds||[]).map(f=>`<tr><td>${escapeHtml((f.company+" "+f.fundName).trim())}</td><td>${fmt(f.amount)}</td><td>${escapeHtml(f.type)}</td></tr>`).join("");
-    const blended = aLump>0 ? `<p class="kv" style="margin:4px 0 0;">With <b>${fmt(aLump)}</b> lumpsum (≈${fmt(fvLump)} at maturity), the remaining <b>${fmt(remain)}</b> needs about <b>${fmt(reqSipRemain)}/month</b> via SIP${aSip?` — ${fmt(aSip)}/m currently allocated`:""}.</p>` : "";
+    const blended = (aLump||aSip) ? `<p class="kv" style="margin:4px 0 0;">Allocated ${aLump?`<b>${fmt(aLump)}</b> lumpsum → <b>${fmt(fvLump)}</b>`:""}${(aLump&&aSip)?" and ":""}${aSip?`<b>${fmt(aSip)}/month</b> SIP → <b>${fmt(fvSip)}</b>`:""}. Projected maturity <b>${fmt(totFv)}</b> vs goal <b>${fmt(fv)}</b>${totFv>=fv*0.99?" — on track.":` — short by <b>${fmt(Math.max(0,fv-totFv))}</b>.`}</p>` : "";
     return `<div class="avoid" style="border:1px solid #DDE3EC;border-left:5px solid #E8551F;border-radius:10px;padding:14px 18px;margin:14px 0;background:#fbfcfe;">
       <div style="font-size:18px;font-weight:800;color:#0F2C60;">${escapeHtml(g.name)}${g.forMember?` — for ${escapeHtml(g.forMember)}`:""}</div>
-      <p style="font-size:15px;margin:8px 0 4px;"><b>Present cost:</b> ${fmt(g.presentCost)} &nbsp;·&nbsp; <b>Years:</b> ${g.years} &nbsp;·&nbsp; <b>Expected return:</b> ${r}% &nbsp;·&nbsp; <b>Future value:</b> <span style="color:#E8551F;font-weight:800;">${fmt(fv)}</span></p>
-      <p style="font-size:15px;margin:0 0 8px;"><b>Required:</b> ${fmt(sip)}/month SIP &nbsp;<b>or</b>&nbsp; ${fmt(lump)} one-time lumpsum</p>
+      <p style="font-size:15px;margin:8px 0 4px;"><b>Present cost:</b> ${fmt(g.presentCost)} &nbsp;·&nbsp; <b>Years:</b> ${g.years} &nbsp;·&nbsp; <b>Inflation:</b> ${infl}% &nbsp;·&nbsp; <b>Return:</b> ${r}% &nbsp;·&nbsp; <b>Future value:</b> <span style="color:#E8551F;font-weight:800;">${fmt(fv)}</span></p>
+      <p style="font-size:15px;margin:0 0 8px;"><b>To reach it:</b> ${fmt(sip)}/month SIP &nbsp;<b>or</b>&nbsp; ${fmt(lump)} one-time lumpsum</p>
       ${funds?`<table class="data"><thead><tr><th>Fund</th><th>Amount</th><th>Type</th></tr></thead><tbody>${funds}</tbody></table>`:'<p class="kv">Fund allocation to be advised.</p>'}${blended}</div>`;
   });
 
@@ -1647,7 +1677,7 @@ function buildFullReport(p){
     const catW={}; allFunds.forEach(f=>{ const c=fundCategory(f.fundName); const w=f.type==="SIP"?f.amount*12:f.amount; catW[c]=(catW[c]||0)+w; });
     const catArr=Object.entries(catW).map(([label,value])=>({label,value}));
     const fundRows=allFunds.map(f=>`<tr><td>${escapeHtml((f.company+" "+f.fundName).trim())}</td><td>${escapeHtml(f.purpose)}</td><td>${fmt(f.amount)}</td><td>${escapeHtml(f.type)}</td></tr>`).join("");
-    const targetTotal=p.goals.reduce((s,g)=>s+futureValue(g.presentCost,g.years,Number(ASSUMP.inflation)||0),0);
+    const targetTotal=p.goals.reduce((s,g)=>s+futureValue(g.presentCost,g.years,(g.inflation!=null?Number(g.inflation):6)),0);
     pages.push(`<div class="pbreak"></div>`+page(`<h2>Recommended Portfolio &amp; Projected Growth</h2>
       <p class="kv">Your consolidated investment plan and how the portfolio is positioned after investment, aligned to your <b>${escapeHtml(p.riskProfile)}</b> risk profile.</p>
       <table class="data"><thead><tr><th>Fund</th><th>Purpose</th><th>Amount</th><th>Type</th></tr></thead><tbody>${fundRows}</tbody></table>
@@ -1657,10 +1687,10 @@ function buildFullReport(p){
   }
 
   // 9 protection
-  const insRows=p.insurance.map(i=>`<tr><td>${escapeHtml(i.product)}</td><td>${escapeHtml(i.insurer)}</td><td>${fmt(i.sumAssured)}</td><td>${fmt(i.premium)}/yr</td><td>${escapeHtml(i.ppt)}</td><td>${escapeHtml(i.term)}</td></tr>`).join("");
+  const insRows=p.insurance.map(i=>`<tr><td>${escapeHtml(i.product)}</td><td>${escapeHtml(i.insurer)}</td><td>${fmt(i.sumAssured)}</td><td>${fmt(i.premium)}/yr</td><td>${escapeHtml(i.ppt)}</td><td>${escapeHtml(i.startDate||"")}</td><td>${escapeHtml(i.endDate||"")}</td><td>${escapeHtml(i.remarks||"")}</td></tr>`).join("");
   const protRows=p.protection.map(r=>`<tr><td>${escapeHtml(r.type)}</td><td>${fmt(r.sumAssured)}</td><td>${escapeHtml(r.benefits)}</td></tr>`).join("");
   if(insRows||protRows){ pages.push(`<div class="pbreak"></div>`+page(`<h2>Protection Planning</h2>
-    ${insRows?`<h3>Existing policies</h3><table class="data"><thead><tr><th>Product</th><th>Insurer</th><th>Sum assured</th><th>Premium</th><th>PPT</th><th>Term</th></tr></thead><tbody>${insRows}</tbody></table>`:""}
+    ${insRows?`<h3>Existing policies</h3><table class="data"><thead><tr><th>Product</th><th>Insurer</th><th>Sum assured</th><th>Premium</th><th>PPT</th><th>Start</th><th>End</th><th>Remarks</th></tr></thead><tbody>${insRows}</tbody></table>`:""}
     ${protRows?`<h3>Recommended cover</h3><table class="data"><thead><tr><th>Type</th><th>Recommended</th><th>Benefits</th></tr></thead><tbody>${protRows}</tbody></table>`:""}
     <p class="kv">Adequate life and health cover safeguards your family's financial security without compromising your investment goals.</p>`)); }
 
@@ -1852,7 +1882,12 @@ $("branch").innerHTML=BRANCHES.map(b=>`<option>${b}</option>`).join("");
 buildSecNav();
 initLists();
 function clampMax(e){ const t=e&&e.target; if(t&&t.type==="number"&&t.max!==""&&t.max!=null&&+t.value> +t.max) t.value=t.max; }
-$("editorView").addEventListener("input",(e)=>{ clampMax(e); recalc(); scheduleAutosave(); });
+function fmtLC(n){ n=Number(n)||0; if(n>=1e7) return "₹"+(n/1e7).toFixed(2)+" Cr"; if(n>=1e5) return "₹"+(n/1e5).toFixed(2)+" L"; if(n>=1000) return "₹"+(n/1000).toFixed(1)+" K"; return "₹"+n; }
+function showAmtHint(el){ const h=$("amtHint"); if(!h) return; if(!el||el.type!=="number"||el.value===""||!(Number(el.value)>=1000)){ h.style.display="none"; return; } const r=el.getBoundingClientRect(); h.textContent="= "+fmtLC(el.value); h.style.left=r.left+"px"; h.style.top=(r.bottom+3)+"px"; h.style.display="block"; }
+function hideAmtHint(){ const h=$("amtHint"); if(h) h.style.display="none"; }
+$("editorView").addEventListener("focusin",(e)=>{ if(e.target.type==="number") showAmtHint(e.target); });
+$("editorView").addEventListener("focusout",hideAmtHint);
+$("editorView").addEventListener("input",(e)=>{ clampMax(e); if(e.target.type==="number") showAmtHint(e.target); recalc(); scheduleAutosave(); });
 $("editorView").addEventListener("change",(e)=>{ clampMax(e); recalc(); scheduleAutosave(); });
 $("calcView").addEventListener("input",(e)=>{ clampMax(e); calcAll(); });
 $("calcView").addEventListener("change",(e)=>{ clampMax(e); calcAll(); });

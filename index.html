@@ -193,8 +193,6 @@
     <div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@wallet4wealth.com" autocomplete="username" /></div>
     <div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
     <button class="btn" style="width:100%;" onclick="doLogin()">Sign in</button>
-    <div style="text-align:center;color:var(--muted);font-size:12px;margin:14px 0 8px;">— or sign in without a password —</div>
-    <button class="btn ghost" style="width:100%;" onclick="sendLoginLink()">Email me a one-time login link</button>
     <div id="loginErr" class="err"></div>
   </div>
 </div>
@@ -278,7 +276,7 @@
       <div class="panel">
         <h3>People</h3>
         <p class="sub">Assign each person to a team and set their role. New logins appear here automatically as unassigned.</p>
-        <table class="calc"><thead><tr><th>Email</th><th>Team</th><th>Role</th><th></th></tr></thead>
+        <table class="calc"><thead><tr><th>Person</th><th>Team</th><th>Role</th><th></th></tr></thead>
         <tbody id="userRows"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody></table>
       </div>
       <div class="panel">
@@ -607,22 +605,8 @@
   <label>New password</label>
   <input id="newPw" type="password" placeholder="min 6 characters" style="width:100%;margin-bottom:10px;">
   <button class="btn" onclick="changeMyPassword()">Change password</button>
-  <button class="btn ghost" style="margin-left:8px;" onclick="sendMyReset()">Email me a reset link</button>
-  <hr style="border:none;border-top:1px solid var(--line);margin:16px 0;">
-  <div style="font-weight:700;color:#0F2C60;">Two-factor authentication (OTP)</div>
-  <div id="mfaStatus" class="muted" style="font-size:12.5px;margin:4px 0 10px;">Checking…</div>
-  <div id="mfaSetup" class="hidden">
-    <p class="muted" style="font-size:12px;margin:0 0 8px;">Scan this in Google/Microsoft Authenticator (or enter the key manually), then type the 6-digit code to confirm.</p>
-    <div id="mfaQr"></div>
-    <div class="muted" style="font-size:12px;word-break:break-all;margin-top:6px;">Key: <b id="mfaSecretText"></b></div>
-    <input id="mfaConfirm" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="width:150px;margin-top:8px;">
-    <button class="btn small" onclick="confirmEnableMfa()">Confirm &amp; enable</button>
-  </div>
-  <div style="margin-top:8px;">
-    <button class="btn ghost small" id="mfaEnableBtn" onclick="startEnableMfa()">Enable 2FA</button>
-    <button class="btn danger small hidden" id="mfaDisableBtn" onclick="disableMfa()">Disable 2FA</button>
-  </div>
-  <button class="btn ghost small" style="margin-top:14px;width:100%;" onclick="$('accountModal').classList.add('hidden')">Close</button>
+  <p class="muted" style="font-size:12px;margin-top:12px;">Two-factor login is managed by your administrator and applies to everyone.</p>
+  <button class="btn ghost small" style="margin-top:10px;width:100%;" onclick="$('accountModal').classList.add('hidden')">Close</button>
 </div></div>
 
 <div id="presentMode" class="hidden" style="position:fixed;inset:0;background:#0a1428;z-index:300;display:flex;flex-direction:column;">
@@ -1059,7 +1043,7 @@ function showSetup(g){
   document.querySelectorAll("#setupNav button").forEach(b=>b.classList.toggle("active",b.dataset.sg===g));
 }
 function doLogout(){ auth.signOut(); }
-function openAccount(){ if($("acctWho")) $("acctWho").textContent="Signed in as "+((currentUser&&currentUser.email)||""); if($("newPw")) $("newPw").value=""; if($("mfaSetup")) $("mfaSetup").classList.add("hidden"); loadMfaStatus(); $("accountModal").classList.remove("hidden"); }
+function openAccount(){ if($("acctWho")) $("acctWho").textContent="Signed in as "+((currentUser&&currentUser.email)||""); if($("newPw")) $("newPw").value=""; $("accountModal").classList.remove("hidden"); }
 
 /* ---------- 2FA (TOTP) ---------- */
 let mfaVerified=false, MFA_SECRET=null, mfaDraftSecret=null;
@@ -1226,13 +1210,22 @@ function loadUsers(){
       const ts=opts.replace(`value="${u.teamId}"`,`value="${u.teamId}" selected`);
       const rs=["member","admin"].map(r=>`<option value="${r}" ${u.role===r?"selected":""}>${r}</option>`).join("");
       const who=u.name?`<b>${escapeHtml(u.name)}</b><br><span class="muted" style="font-size:11px;">${escapeHtml(u.email||d.id)}</span>`:escapeHtml(u.email||d.id);
-      html+=`<tr><td>${who}</td><td><select id="team_${d.id}">${ts}</select></td><td><select id="role_${d.id}">${rs}</select></td><td><button class="btn small" onclick="saveUser('${d.id}')">Save</button> <button class="btn ghost small" onclick="resetUserPassword('${escapeHtml(u.email||"")}')">Reset pwd</button> <button class="btn ghost small" onclick="resetUserMfa('${d.id}')">Clear 2FA</button></td></tr>`;
+      html+=`<tr><td><input id="name_${d.id}" value="${escapeHtml(u.name||"")}" placeholder="Name" style="width:150px;"><br><span class="muted" style="font-size:11px;">${escapeHtml(u.email||d.id)}</span></td><td><select id="team_${d.id}">${ts}</select></td><td><select id="role_${d.id}">${rs}</select></td><td><button class="btn small" onclick="saveUser('${d.id}')">Save</button> <button class="btn ghost small" onclick="resetUserPassword('${escapeHtml(u.email||"")}')">Reset pwd</button> <button class="btn danger small" onclick="removeUser('${d.id}','${escapeHtml(u.email||"")}')">Remove</button></td></tr>`;
     });
     tb.innerHTML=html;
   }).catch(e=>tb.innerHTML='<tr><td colspan="4" class="muted">Couldn\'t load: '+escapeHtml(e.message)+'</td></tr>');
 }
 function saveUser(uid){
-  db.collection("users").doc(uid).update({teamId:$("team_"+uid).value||null,role:$("role_"+uid).value}).then(()=>toast("Saved.")).catch(e=>toast("Couldn't save: "+e.message));
+  const name=$("name_"+uid)?$("name_"+uid).value.trim():undefined;
+  const data={teamId:$("team_"+uid).value||null, role:$("role_"+uid).value};
+  if(name!==undefined) data.name=name;
+  db.collection("users").doc(uid).update(data).then(()=>toast("Saved.")).catch(e=>toast("Couldn't save: "+e.message));
+}
+function removeUser(uid,email){
+  if(uid===(currentUser&&currentUser.uid)){ toast("You can't remove your own account here."); return; }
+  if(!confirm("Remove "+(email||"this user")+"?\n\nThey lose all access (team & role are cleared). Their Firebase login still exists — to delete it fully, remove them from the Firebase console → Authentication.")) return;
+  Promise.all([ db.collection("users").doc(uid).delete(), db.collection("mfa").doc(uid).delete().catch(()=>{}) ])
+    .then(()=>{ toast("User removed."); loadUsers(); }).catch(e=>toast("Remove failed: "+e.message));
 }
 
 /* ---------- plans ---------- */
